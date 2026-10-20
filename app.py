@@ -5,7 +5,6 @@ import json
 import os
 import tempfile
 from pathlib import Path
-import subprocess
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -14,6 +13,7 @@ import webbrowser
 import pymupdf as fitz
 from cropper import inspect, export, open_document
 from label_info import read_info, validate_info
+from platform_support import open_folder
 
 SCHEMA_VERSION = 2
 
@@ -163,7 +163,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply((ROOT/'index.html').read_bytes(), 'text/html; charset=utf-8')
             with LOCK:
                 if route.path == '/api/jobs':
-                    return self.reply({'jobs': sorted(JOBS.values(), key=lambda j: j['time'], reverse=True), 'input': str(INPUT), 'output': str(OUTPUT)})
+                    return self.reply({'app': 'cut-label', 'root': str(ROOT), 'jobs': sorted(JOBS.values(), key=lambda j: j['time'], reverse=True), 'input': str(INPUT), 'output': str(OUTPUT)})
                 if route.path in ('/preview', '/download'):
                     job = JOBS[q['id'][0]]
                     if route.path == '/download':
@@ -191,7 +191,7 @@ class Handler(BaseHTTPRequestHandler):
             with LOCK:
                 if self.path == '/api/open':
                     folder = INPUT if body['folder'] == 'input' else OUTPUT
-                    subprocess.Popen(['open', str(folder)])
+                    open_folder(folder)
                 elif self.path == '/api/confirm':
                     finish(JOBS[body['id']], body['boxes'], body.get('infos'))
                     save()

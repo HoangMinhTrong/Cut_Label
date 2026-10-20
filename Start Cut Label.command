@@ -1,14 +1,15 @@
 #!/bin/zsh
-cd "${0:A:h}"
-if /usr/bin/curl -fsS --max-time 2 http://127.0.0.1:8765/api/jobs 2>/dev/null | /usr/bin/grep -q '"input".*Cut_Label/input'; then
-  /usr/bin/open http://127.0.0.1:8765
-  exit 0
-fi
-if [[ ! -x .venv/bin/python ]]; then
-  /usr/bin/python3 -m venv .venv || exit 1
-fi
-if ! .venv/bin/python -c 'import pymupdf, cv2, numpy' 2>/dev/null; then
-  .venv/bin/python -m pip install -r requirements.txt || { read '?Không cài được thư viện. Nhấn Enter để đóng.'; exit 1; }
-fi
-.venv/bin/python app.py
-read '?App đã dừng. Nhấn Enter để đóng.'
+cd "${0:A:h}" || exit 1
+for candidate in python3.12 python3.11 python3.10 python3.9 python3; do
+  if command -v "$candidate" >/dev/null 2>&1 && "$candidate" -c 'import sys; sys.exit(not ((3,9) <= sys.version_info[:2] <= (3,12)))' 2>/dev/null; then
+    "$candidate" bootstrap.py
+    result=$?
+    if [[ $result -ne 0 ]]; then
+      read '?Khong khoi dong duoc app. Nhan Enter de dong.'
+    fi
+    exit $result
+  fi
+done
+print 'Hay cai Python 3.12 tu https://www.python.org/downloads/ roi mo lai.'
+read '?Nhan Enter de dong.'
+exit 1

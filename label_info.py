@@ -3,17 +3,22 @@ import json
 from pathlib import Path
 import re
 import subprocess
+import sys
 import tempfile
 import unicodedata
 import pymupdf as fitz
 
 ROOT = Path(__file__).resolve().parent
+_RAPID_ENGINE = None
 
 
 def safe_buyer(value):
     value = unicodedata.normalize('NFKC', value).strip().lstrip('@')
     value = re.sub(r'[^\w. -]', '_', value, flags=re.UNICODE)
     value = re.sub(r'\s+', ' ', value).strip(' ._-')
+    reserved = {'CON', 'PRN', 'AUX', 'NUL'} | {f'{prefix}{n}' for prefix in ('COM', 'LPT') for n in range(1, 10)}
+    if value.split('.')[0].upper() in reserved:
+        value = '_' + value
     return value[:80].encode('utf-8')[:180].decode('utf-8', errors='ignore')
 
 
@@ -44,7 +49,7 @@ def parse_lines(lines):
             'info_review': not (buyer and number and buyers[buyer] >= .8 and tracking[number] >= .8)}
 
 
-def ocr_lines(page, box):
+def vision_lines(image):
     binary = ROOT/'.state/label-ocr'
     source = ROOT/'ocr.swift'
     if not binary.exists() or binary.stat().st_mtime < source.stat().st_mtime:
@@ -52,6 +57,32 @@ def ocr_lines(page, box):
         cache.mkdir(parents=True, exist_ok=True)
         subprocess.run(['xcrun', 'swiftc', '-module-cache-path', str(cache), str(source), '-o', str(binary)],
                        capture_output=True, check=True, timeout=180)
+    result = subprocess.run([str(binary), str(image)], capture_output=True, check=True, timeout=90)
+    return json.loads(result.stdout)
+
+
+def rapid_lines(image):
+    global _RAPID_ENGINE
+    from rapidocr_onnxruntime import RapidOCR
+    if _RAPID_ENGINE is None:
+        _RAPID_ENGINE = RapidOCR(intra_op_num_threads=2, inter_op_num_threads=2)
+    result, _ = _RAPID_ENGINE(str(image))
+    return [{'text': text, 'confidence': float(score)} for _, text, score in (result or [])]
+
+
+def recognize_image(image):
+    # Windows never attempts to compile or run the Apple helper.
+    if sys.platform == 'darwin':
+        try:
+            lines = vision_lines(image)
+            if not parse_lines(lines)['info_review']:
+                return lines
+        except (OSError, ValueError, subprocess.SubprocessError):
+            pass
+    return rapid_lines(image)
+
+
+def ocr_lines(page, box):
     r = page.rect
     clip = fitz.Rect(box[0]*r.width, box[1]*r.height, box[2]*r.width, box[3]*r.height)
     scale = min(4, 4000/max(clip.width, clip.height))
@@ -59,8 +90,7 @@ def ocr_lines(page, box):
         image = Path(td)/'label.png'
         pix = page.get_pixmap(matrix=fitz.Matrix(scale, scale), clip=clip, alpha=False)
         pix.save(image)
-        result = subprocess.run([str(binary), str(image)], capture_output=True, check=True, timeout=90)
-        return json.loads(result.stdout)
+        return recognize_image(image)
 
 
 def read_info(page, box):
@@ -76,7 +106,9 @@ def read_info(page, box):
         info['info_source'] = 'OCR'
         if info['info_review']:
             info['info_note'] = 'Chưa đọc chắc Buyer/tracking. Kiểm tra và nhập lại trước khi xuất.'
-    except (OSError, ValueError, subprocess.SubprocessError) as exc:
+    except Exception as exc:
+        # Model/runtime failures must leave the label available for manual review.
+        print(f'OCR không khả dụng: {type(exc).__name__}: {exc}', file=sys.stderr, flush=True)
         info.update(info_review=True, info_note='Không chạy được OCR; hãy nhập Buyer và tracking.', info_source='Nhập tay')
     return info
 
