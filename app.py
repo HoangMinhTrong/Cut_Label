@@ -5,6 +5,7 @@ import json
 import os
 import tempfile
 from pathlib import Path
+import sys
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -17,7 +18,12 @@ from platform_support import open_folder
 
 SCHEMA_VERSION = 2
 
-ROOT = Path(__file__).resolve().parent
+# In a PyInstaller build, code/assets live in the temporary bundle directory but
+# user data must stay beside the executable so the portable folder can be moved.
+FROZEN = getattr(sys, 'frozen', False)
+ASSET_ROOT = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent))
+ROOT = Path(sys.executable).resolve().parent if FROZEN else Path(__file__).resolve().parent
+ROOT = Path(os.environ.get('CUT_LABEL_DATA_DIR', str(ROOT))).resolve()
 INPUT, OUTPUT, STATE = ROOT/'input', ROOT/'output', ROOT/'.state'
 for folder in (INPUT, OUTPUT, STATE):
     folder.mkdir(exist_ok=True)
@@ -160,7 +166,7 @@ class Handler(BaseHTTPRequestHandler):
             route = urlparse(self.path)
             q = parse_qs(route.query)
             if route.path == '/':
-                return self.reply((ROOT/'index.html').read_bytes(), 'text/html; charset=utf-8')
+                return self.reply((ASSET_ROOT/'index.html').read_bytes(), 'text/html; charset=utf-8')
             with LOCK:
                 if route.path == '/api/jobs':
                     return self.reply({'app': 'cut-label', 'root': str(ROOT), 'jobs': sorted(JOBS.values(), key=lambda j: j['time'], reverse=True), 'input': str(INPUT), 'output': str(OUTPUT)})

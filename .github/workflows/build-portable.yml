@@ -1,0 +1,71 @@
+name: Build portable apps
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact: Cut-Label-Windows-x64
+            archive: zip
+          - os: macos-15-intel
+            artifact: Cut-Label-macOS-Intel
+            archive: tar
+          - os: macos-15
+            artifact: Cut-Label-macOS-Apple-Silicon
+            archive: tar
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: python -m pip install -r requirements-build.txt
+      - name: Build self-contained application
+        shell: bash
+        run: >-
+          pyinstaller --noconfirm --clean --onedir --console
+          --name "Cut Label"
+          --add-data "index.html:."
+          --collect-all rapidocr_onnxruntime
+          --collect-all onnxruntime
+          app.py
+      - name: Prepare Windows package
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path package/input, package/output
+          Copy-Item -Recurse "dist/Cut Label/*" package/
+          New-Item -ItemType File -Force package/input/.gitkeep, package/output/.gitkeep
+          Copy-Item README.md package/
+          Compress-Archive -Path package/* -DestinationPath "${{ matrix.artifact }}.zip"
+      - name: Prepare macOS package
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          mkdir -p package/input package/output
+          cp -R "dist/Cut Label/"* package/
+          cp "Cut Label.command" README.md package/
+          chmod +x "package/Cut Label" "package/Cut Label.command"
+          tar -czf "${{ matrix.artifact }}.tar.gz" -C package .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}.${{ matrix.archive == 'zip' && 'zip' || 'tar.gz' }}
+          if-no-files-found: error
+      - name: Attach package to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.artifact }}.${{ matrix.archive == 'zip' && 'zip' || 'tar.gz' }}

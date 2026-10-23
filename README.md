@@ -2,13 +2,37 @@
 
 App local cho **Windows 10/11 (64-bit)** và **macOS**. Theo dõi folder `input`, cắt label và lưu PDF vào `output`.
 
-## Cài đặt lần đầu
+## Dùng ngay, không cần cài đặt (khuyến nghị)
+
+Sau khi pull, mở `Start Cut Label.bat` (Windows) hoặc `Start Cut Label.command`
+(macOS). Launcher tự tải Release v1.0.0 đúng nền tảng vào `.runtime`, không
+cần cài Python. Lần đầu cần Internet; các lần sau dùng bản đã tải.
+Dữ liệu vẫn nằm trong `input`, `output`, `.state` tại thư mục repo.
+Người quản lý repo phải publish tag v1.0.0 qua workflow build trước khi sử dụng.
+Launcher chạy binary của Release v1.0.0; thay đổi source chưa phát hành sẽ
+không xuất hiện trong binary. Khi phát hành bản mới, cập nhật version trong
+`launch.sh` và `launch.ps1` tương ứng.
+
+Mở trang **Releases** của repository và tải đúng gói:
+
+- Windows 10/11 64-bit: `Cut-Label-Windows-x64.zip`, giải nén rồi mở `Cut Label.exe`.
+- Mac dùng chip Apple (M1/M2/M3/M4): `Cut-Label-macOS-Apple-Silicon.tar.gz`, giải nén rồi mở `Cut Label.command`.
+- Mac dùng chip Intel: `Cut-Label-macOS-Intel.tar.gz`, giải nén rồi mở `Cut Label.command`.
+
+Gói portable đã chứa Python, thư viện và model OCR; không cần cài Python, Xcode,
+Tesseract hay GPU và không cần Internet khi chạy. Luôn giải nén toàn bộ gói trước
+khi mở, không kéo riêng file chạy ra ngoài thư mục.
+
+macOS có thể chặn ứng dụng tải từ Internet vì bản cộng đồng chưa được Apple
+notarize. Lần đầu, Control-click `Cut Label.command`, chọn **Open**, rồi xác nhận
+**Open**. Các lần sau có thể mở bình thường.
+
+## Chạy từ mã nguồn (dành cho phát triển)
 
 - Cài **Python 3.12 64-bit** từ https://www.python.org/downloads/ (app hỗ trợ Python 3.9–3.12). Trên Windows, chọn **Add python.exe to PATH** khi cài. Windows ARM chưa được kiểm thử; nên dùng bản x64.
 - Tải/clone toàn bộ repo, giải nén vào một thư mục có quyền ghi. Không chạy trực tiếp bên trong file ZIP. Không copy `.venv` từ máy khác/hệ điều hành khác.
-- Mở file khởi động tương ứng bên dưới. Lần đầu cần Internet để tự tạo `.venv` và tải thư viện/model OCR; các lần sau xử lý tại máy, không cần Internet.
-- macOS: nếu file `.command` không mở được sau khi tải ZIP, chạy `chmod +x "Start Cut Label.command"` trong thư mục dự án, hoặc `python3 bootstrap.py`.
-- Khi cập nhật code: đóng Terminal app cũ rồi mở lại launcher để cập nhật thư viện và chạy bản mới.
+- Chạy `python3 bootstrap.py` trên macOS hoặc `py -3.12 bootstrap.py` trên Windows. Lần đầu cần Internet để tạo `.venv` và cài thư viện.
+- Khi cập nhật source: đóng Terminal app cũ rồi chạy lại `bootstrap.py`.
 
 ## Sử dụng
 
@@ -50,7 +74,7 @@ Windows (PowerShell hoặc CMD):
 py -3.12 bootstrap.py
 ```
 
-Launcher tự tạo môi trường và cài đúng thư viện. Nếu muốn chạy trực tiếp sau khi cài: macOS dùng `.venv/bin/python app.py`; Windows dùng `.venv\Scripts\python.exe app.py`.
+`bootstrap.py` tự tạo môi trường và cài đúng thư viện cho người phát triển. Nếu muốn chạy trực tiếp sau khi cài: macOS dùng `.venv/bin/python app.py`; Windows dùng `.venv\Scripts\python.exe app.py`.
 
 Có thể dùng `--port 8766` hoặc `--no-browser`. Mỗi lần chỉ mở một instance app trên cùng folder.
 

@@ -1,9 +1,16 @@
 .venv/
+.runtime/
 .state/
 __pycache__/
 .DS_Store
 Thumbs.db
 input/*
 output/*
+build/
+dist/
+*.spec
+package/
+Cut-Label-*.zip
+Cut-Label-*.tar.gz
 !input/.gitkeep
 !output/.gitkeep
